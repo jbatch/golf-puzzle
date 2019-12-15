@@ -13,7 +13,6 @@ type Props = {
 const TURN_SPEED = 3;
 
 export default class AimingGuide extends Phaser.GameObjects.Image {
-  
   angle: number;
   constructor({scene, x, y, texture, frame}: Props) {
     super(scene, x, y, texture || 'aiming_guide', frame);
