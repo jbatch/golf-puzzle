@@ -4,6 +4,7 @@ import 'phaser';
 import AimingGuide from './aiming_guide';
 import PowerSlider from './power-slider';
 import { StateManager } from '../state-manager';
+import EventManager from '../event-manager';
 
 type Props = {
   scene: Phaser.Scene;
@@ -19,6 +20,7 @@ export default class Ball extends Phaser.Physics.Matter.Image {
   private actionKey: Phaser.Input.Keyboard.Key;
   private ballState: string;
   private sensor: any;
+  private circleSensor: any;
   private sleepCounter: number;
   aimingGuide: AimingGuide;
   powerSlider: PowerSlider;
@@ -40,12 +42,13 @@ export default class Ball extends Phaser.Physics.Matter.Image {
     const Bodies = this.scene.matter.bodies as any;
     const Body = this.scene.matter.body as any;
     const mainBody = Bodies.circle(this.x + 6, this.y + 0, 8);
-    this.sensor = Bodies.rectangle(this.x + 6, this.y, 10, 30, {
+    this.circleSensor = Bodies.circle(this.x+6, this.y, 12, {isSensor: true});
+    this.sensor = Bodies.rectangle(this.x + 6, this.y, 10, 24, {
       isSensor: true
     });
     this.sleepCounter = 0;
     const body = Body.create({
-      parts: [mainBody, this.sensor],
+      parts: [mainBody, this.circleSensor, this.sensor],
       restitution: 0.9,
       friction: 0
     });
@@ -59,6 +62,16 @@ export default class Ball extends Phaser.Physics.Matter.Image {
     });
     MatterCollision.addOnCollideActive({
       objectA: this.sensor,
+      callback: this.onSensorCollide,
+      context: this
+    });
+    MatterCollision.addOnCollideStart({
+      objectA: this.circleSensor,
+      callback: this.onSensorCollide,
+      context: this
+    });
+    MatterCollision.addOnCollideActive({
+      objectA: this.circleSensor,
       callback: this.onSensorCollide,
       context: this
     });
@@ -77,7 +90,16 @@ export default class Ball extends Phaser.Physics.Matter.Image {
   onSensorCollide({ bodyA, bodyB }) {
     if (bodyB.isSensor) return;
     const go = (bodyB as any).gameObject;
-    if (go && go.tile && go.tile.properties.goal) {
+    if(!go || !go.tile) {
+      return;
+    }
+    if(go.tile.properties.key) {
+      EventManager.getInstance().emit('key_collected');
+    }
+    if(bodyA == this.circleSensor) {
+      return;
+    }
+    if (bodyA === this.sensor && go.tile.properties.goal) {
       this.touching.down = 'goal';
     } else {
       this.touching.down = 'ground';
@@ -125,7 +147,7 @@ export default class Ball extends Phaser.Physics.Matter.Image {
   }
 
   ballStopped() {
-    console.log('stopped');
+    console.log('stopped', this.touching);
     this.setVelocity(0, 0);
     this.ballState = 'idle';
     if (this.touching.down === 'goal') {
